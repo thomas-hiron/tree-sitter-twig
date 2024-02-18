@@ -4,12 +4,35 @@ const REGEX_STRING_INTERPOLATED = /[^#"\\\\]+/;
 const REGEX_NUMBER = /[0-9]+(?:\.[0-9]+)?([Ee][\+\-][0-9]+)?/;
 
 module.exports = grammar({
-  name: 'twig',
+  name: 'twig_indent',
   extras: () => [/\s/],
   rules: {
     template: ($) =>
-      repeat(
-        choice($.statement_directive, $.output_directive, $.comment, $.content)
+      repeat(choice($.statement_directive, $.if_block, $.for_block, $.output_directive, $.comment, $.content)),
+
+    if_block: ($) =>
+      seq(
+        choice('{%', '{%-', '{%~'),
+        $.if_statement,
+        choice('%}', '-%}', '~%}'),
+        repeat(choice($.for_block, $.output_directive, $.comment, $.content)),
+        $.endif_statement,
+      ),
+
+    endif_statement: ($) =>
+      seq(
+        choice('{%', '{%-', '{%~'),
+        alias('endif', $.conditional),
+        choice('%}', '-%}', '~%}'),
+      ),
+
+    for_block: ($) =>
+      seq(
+        choice('{%', '{%-', '{%~'),
+        $.for_statement,
+        choice('%}', '-%}', '~%}'),
+        repeat(choice($.if_block, $.output_directive, $.comment, $.content)),
+        "{% endfor %}"
       ),
 
     content: () => prec.right(repeat1(/[^\{]+|\{/)),
@@ -22,15 +45,12 @@ module.exports = grammar({
     _statement: ($) =>
       choice(
         $.assignment_statement,
-        $.for_statement,
-        $.if_statement,
         $.macro_statement,
         $.import_statement,
         $.from_statement,
 
         alias($.include_statement, $.tag_statement),
         alias($.with_statement, $.tag_statement),
-        $.tag_statement
       ),
 
     assignment_statement: ($) =>
